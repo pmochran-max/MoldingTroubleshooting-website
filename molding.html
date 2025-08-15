@@ -1,0 +1,1233 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  Eye, 
+  Ruler, 
+  TestTube, 
+  RotateCcw, 
+  ChevronDown, 
+  ChevronRight, 
+  Search, 
+  Download,
+  Star,
+  BookmarkPlus,
+  Filter,
+  AlertTriangle,
+  CheckCircle,
+  Settings,
+  Thermometer,
+  Gauge,
+  Clock,
+  Zap,
+  FileText
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+
+interface Defect {
+  name: string;
+  description: string;
+  causes: {
+    temperature?: string[];
+    pressure?: string[];
+    speed?: string[];
+    timing?: string[];
+    mold?: string[];
+    material?: string[];
+  };
+  solutions: string[];
+  parameterAdjustments: {
+    temperature?: string;
+    pressure?: string;
+    speed?: string;
+    timing?: string;
+  };
+  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+}
+
+interface DefectCategory {
+  id: string;
+  title: string;
+  color: string;
+  icon: React.ComponentType<any>;
+  defects: Defect[];
+}
+
+const defectCategories: DefectCategory[] = [
+  {
+    id: 'visual',
+    title: 'Visual Defects',
+    color: 'blue',
+    icon: Eye,
+    defects: [
+      {
+        name: 'Flash',
+        description: 'Excess material that appears as thin fins along the parting line or around ejector pins',
+        causes: {
+          pressure: ['Injection pressure too high', 'Clamping force insufficient'],
+          temperature: ['Melt temperature too high causing low viscosity'],
+          mold: ['Worn or damaged mold surfaces', 'Poor mold alignment', 'Inadequate venting'],
+          material: ['Low viscosity grade material', 'Contaminated material']
+        },
+        solutions: [
+          'Reduce injection pressure by 10-20%',
+          'Increase clamping force',
+          'Lower melt temperature by 10-15°C',
+          'Inspect and repair mold parting surfaces',
+          'Check mold alignment and parallelism',
+          'Improve venting system'
+        ],
+        parameterAdjustments: {
+          pressure: 'Reduce injection pressure to 80-90% of current value',
+          temperature: 'Decrease melt temperature by 10-15°C'
+        },
+        severity: 'High'
+      },
+      {
+        name: 'Sinks and Voids',
+        description: 'Depressions or hollow areas on part surface caused by volumetric shrinkage',
+        causes: {
+          pressure: ['Insufficient hold pressure', 'Hold pressure too short'],
+          timing: ['Premature gate freeze-off', 'Inadequate hold time'],
+          temperature: ['Mold temperature too high', 'Melt temperature inconsistent'],
+          mold: ['Thick sections without proper gating', 'Poor cooling design']
+        },
+        solutions: [
+          'Increase hold pressure by 15-25%',
+          'Extend hold time until gate freeze-off',
+          'Optimize gate size and location',
+          'Improve cooling channel design',
+          'Reduce mold temperature in thick sections'
+        ],
+        parameterAdjustments: {
+          pressure: 'Increase hold pressure to 60-80% of injection pressure',
+          timing: 'Extend hold time by 2-5 seconds'
+        },
+        severity: 'Medium'
+      },
+      {
+        name: 'Short Shots',
+        description: 'Incomplete filling of the mold cavity resulting in missing material',
+        causes: {
+          pressure: ['Injection pressure too low', 'Insufficient shot size'],
+          speed: ['Injection speed too slow', 'Premature speed reduction'],
+          temperature: ['Melt temperature too low', 'Mold temperature too low'],
+          mold: ['Restricted gates or runners', 'Insufficient venting', 'Cold slugs blocking flow']
+        },
+        solutions: [
+          'Increase injection pressure by 15-25%',
+          'Increase injection speed',
+          'Raise melt temperature by 10-20°C',
+          'Improve gate and runner design',
+          'Enhance venting system',
+          'Remove cold material slugs'
+        ],
+        parameterAdjustments: {
+          pressure: 'Increase injection pressure by 15-25%',
+          temperature: 'Increase melt temperature by 10-20°C',
+          speed: 'Increase injection speed by 20-30%'
+        },
+        severity: 'Critical'
+      },
+      {
+        name: 'Jetting',
+        description: 'Snake-like flow pattern visible on part surface from high-speed material entry',
+        causes: {
+          speed: ['Injection speed too high initially', 'Sudden speed changes'],
+          mold: ['Gate too small', 'Poor gate location', 'Abrupt thickness changes'],
+          temperature: ['Melt temperature too low', 'Mold temperature too low']
+        },
+        solutions: [
+          'Reduce initial injection speed',
+          'Use multi-stage injection speed profile',
+          'Increase gate size',
+          'Relocate gate position',
+          'Raise mold temperature by 5-10°C'
+        ],
+        parameterAdjustments: {
+          speed: 'Reduce initial injection speed by 30-50%',
+          temperature: 'Increase mold temperature by 5-10°C'
+        },
+        severity: 'Medium'
+      },
+      {
+        name: 'Gate Blush',
+        description: 'Discoloration or stress whitening around the gate area',
+        causes: {
+          speed: ['Injection speed too high at gate', 'Excessive shear heating'],
+          temperature: ['Melt temperature too high', 'Material degradation'],
+          mold: ['Gate too small causing high shear', 'Sharp gate edges']
+        },
+        solutions: [
+          'Reduce injection speed near gate',
+          'Increase gate size to reduce shear',
+          'Lower melt temperature by 5-10°C',
+          'Polish and radius gate edges',
+          'Use lower temperature processing grade'
+        ],
+        parameterAdjustments: {
+          speed: 'Reduce injection speed by 20-40%',
+          temperature: 'Decrease melt temperature by 5-10°C'
+        },
+        severity: 'Low'
+      },
+      {
+        name: 'Burning (Dieseling)',
+        description: 'Brown or black discoloration from material degradation or trapped air combustion',
+        causes: {
+          speed: ['Injection speed too high', 'Excessive screw speed'],
+          temperature: ['Melt temperature too high', 'Overheating in barrel'],
+          mold: ['Poor venting', 'Air traps in mold', 'Restricted material flow']
+        },
+        solutions: [
+          'Reduce injection speed',
+          'Lower melt temperature by 10-20°C',
+          'Improve mold venting',
+          'Eliminate air traps',
+          'Reduce screw speed',
+          'Check for material contamination'
+        ],
+        parameterAdjustments: {
+          speed: 'Reduce injection speed by 30-50%',
+          temperature: 'Decrease melt temperature by 10-20°C'
+        },
+        severity: 'High'
+      },
+      {
+        name: 'Flow Lines',
+        description: 'Visible lines on part surface showing material flow patterns',
+        causes: {
+          speed: ['Inconsistent injection speed', 'Speed too slow'],
+          temperature: ['Low melt temperature', 'Varying mold temperature'],
+          mold: ['Poor gate location', 'Sudden thickness changes', 'Cold mold regions']
+        },
+        solutions: [
+          'Increase injection speed',
+          'Maintain consistent speed profile',
+          'Raise melt temperature by 5-15°C',
+          'Improve mold temperature uniformity',
+          'Optimize gate location and size'
+        ],
+        parameterAdjustments: {
+          speed: 'Increase injection speed by 15-25%',
+          temperature: 'Increase melt temperature by 5-15°C'
+        },
+        severity: 'Low'
+      },
+      {
+        name: 'Weld and Meld Lines',
+        description: 'Lines where two material flow fronts meet, potentially weak areas',
+        causes: {
+          temperature: ['Low melt temperature', 'Low mold temperature'],
+          speed: ['Injection speed too slow', 'Pressure insufficient at meeting point'],
+          mold: ['Multiple gates causing flow fronts', 'Obstacles in flow path']
+        },
+        solutions: [
+          'Increase melt temperature by 10-20°C',
+          'Raise mold temperature by 10-15°C',
+          'Increase injection speed and pressure',
+          'Relocate gates to minimize weld lines',
+          'Remove or relocate mold obstacles'
+        ],
+        parameterAdjustments: {
+          temperature: 'Increase melt and mold temperatures by 10-20°C',
+          speed: 'Increase injection speed by 20-30%',
+          pressure: 'Increase injection pressure by 10-15%'
+        },
+        severity: 'Medium'
+      },
+      {
+        name: 'Poor Surface Finish',
+        description: 'Rough, dull, or inconsistent surface appearance',
+        causes: {
+          temperature: ['Low mold temperature', 'Inconsistent melt temperature'],
+          speed: ['Injection speed too slow', 'Inconsistent filling'],
+          mold: ['Poor mold surface finish', 'Inadequate mold maintenance'],
+          material: ['Contaminated material', 'Moisture in material']
+        },
+        solutions: [
+          'Increase mold temperature by 10-20°C',
+          'Polish mold cavity surfaces',
+          'Ensure material is properly dried',
+          'Increase injection speed',
+          'Check for material contamination'
+        ],
+        parameterAdjustments: {
+          temperature: 'Increase mold temperature by 10-20°C',
+          speed: 'Increase injection speed by 15-25%'
+        },
+        severity: 'Medium'
+      }
+    ]
+  },
+  {
+    id: 'dimensional',
+    title: 'Dimensional Defects',
+    color: 'green',
+    icon: Ruler,
+    defects: [
+      {
+        name: 'Large Dimensions Overall',
+        description: 'Part dimensions consistently larger than specification',
+        causes: {
+          pressure: ['Hold pressure too high', 'Excessive packing'],
+          temperature: ['Mold temperature too low', 'Insufficient cooling'],
+          timing: ['Hold time too long', 'Cooling time insufficient'],
+          material: ['Material shrinkage less than expected', 'Grade variation']
+        },
+        solutions: [
+          'Reduce hold pressure by 10-20%',
+          'Decrease hold time',
+          'Increase mold temperature for faster cooling',
+          'Verify material grade and shrinkage rate',
+          'Adjust mold dimensions if needed'
+        ],
+        parameterAdjustments: {
+          pressure: 'Reduce hold pressure by 10-20%',
+          timing: 'Decrease hold time by 1-3 seconds'
+        },
+        severity: 'Medium'
+      },
+      {
+        name: 'Small Dimensions Overall',
+        description: 'Part dimensions consistently smaller than specification',
+        causes: {
+          pressure: ['Hold pressure too low', 'Insufficient packing'],
+          timing: ['Hold time too short', 'Premature gate freeze'],
+          temperature: ['Mold temperature too high', 'Excessive shrinkage'],
+          material: ['Higher shrinkage material', 'Material degradation']
+        },
+        solutions: [
+          'Increase hold pressure by 15-25%',
+          'Extend hold time',
+          'Reduce mold temperature',
+          'Check material specifications',
+          'Verify gate freeze time'
+        ],
+        parameterAdjustments: {
+          pressure: 'Increase hold pressure by 15-25%',
+          timing: 'Extend hold time by 2-4 seconds'
+        },
+        severity: 'Medium'
+      },
+      {
+        name: 'Larger Parts at the Gate',
+        description: 'Dimensions near gate are larger than those away from gate',
+        causes: {
+          pressure: ['Excessive pressure at gate area', 'Pressure gradient too steep'],
+          timing: ['Hold pressure applied too long at gate', 'Uneven pressure distribution'],
+          mold: ['Gate size too large', 'Poor runner balance']
+        },
+        solutions: [
+          'Reduce hold pressure gradually',
+          'Implement pressure profile control',
+          'Balance runner system',
+          'Consider gate relocation or sizing',
+          'Use tiered hold pressure reduction'
+        ],
+        parameterAdjustments: {
+          pressure: 'Use stepped pressure reduction profile',
+          timing: 'Apply shorter hold time with gradient'
+        },
+        severity: 'Medium'
+      },
+      {
+        name: 'Smaller Parts at the Gate',
+        description: 'Dimensions near gate are smaller than those away from gate',
+        causes: {
+          pressure: ['Insufficient pressure at gate', 'Pressure drop too high'],
+          timing: ['Gate freeze too early', 'Inadequate pressure transfer'],
+          mold: ['Gate too small', 'High pressure drop in runner']
+        },
+        solutions: [
+          'Increase hold pressure',
+          'Extend hold time',
+          'Increase gate size',
+          'Improve runner design',
+          'Reduce pressure drop in feed system'
+        ],
+        parameterAdjustments: {
+          pressure: 'Increase hold pressure by 20-30%',
+          timing: 'Extend hold time by 3-5 seconds'
+        },
+        severity: 'Medium'
+      },
+      {
+        name: 'Warpage',
+        description: 'Part distortion or bending from internal stresses',
+        causes: {
+          temperature: ['Uneven mold temperature', 'Temperature gradient across part'],
+          timing: ['Uneven cooling rates', 'Premature ejection'],
+          pressure: ['Excessive hold pressure', 'Uneven pressure distribution'],
+          mold: ['Poor cooling channel design', 'Thickness variations']
+        },
+        solutions: [
+          'Balance mold temperature zones',
+          'Optimize cooling channel layout',
+          'Reduce hold pressure if excessive',
+          'Extend cooling time',
+          'Minimize part thickness variations',
+          'Consider annealing process'
+        ],
+        parameterAdjustments: {
+          temperature: 'Balance temperatures within ±5°C',
+          timing: 'Extend cooling time by 20-30%',
+          pressure: 'Reduce hold pressure if above 70% injection pressure'
+        },
+        severity: 'High'
+      }
+    ]
+  },
+  {
+    id: 'material',
+    title: 'Material Defects',
+    color: 'orange',
+    icon: TestTube,
+    defects: [
+      {
+        name: 'Splay, Bubbles, and Blisters',
+        description: 'Surface irregularities caused by moisture or volatile contamination',
+        causes: {
+          material: ['Moisture in material', 'Volatile contaminants', 'Improper drying'],
+          temperature: ['Excessive melt temperature', 'Overheating causing degradation'],
+          timing: ['Excessive residence time', 'Material degradation in barrel']
+        },
+        solutions: [
+          'Properly dry material according to specifications',
+          'Reduce melt temperature by 10-20°C',
+          'Minimize residence time',
+          'Check material storage conditions',
+          'Purge barrel thoroughly',
+          'Use dehumidifying dryer'
+        ],
+        parameterAdjustments: {
+          temperature: 'Reduce melt temperature by 10-20°C',
+          timing: 'Minimize residence time, reduce cycle time'
+        },
+        severity: 'High'
+      },
+      {
+        name: 'Brittleness, Cracking, and Crazing',
+        description: 'Material failure from stress concentration or degradation',
+        causes: {
+          temperature: ['Excessive melt temperature', 'Material degradation'],
+          pressure: ['Excessive hold pressure', 'High internal stress'],
+          material: ['Material degradation', 'Incompatible additives', 'Contamination'],
+          mold: ['Sharp corners', 'Stress concentrators', 'Poor ejection']
+        },
+        solutions: [
+          'Reduce melt temperature',
+          'Lower hold pressure',
+          'Add radii to sharp corners',
+          'Improve ejection system',
+          'Check material compatibility',
+          'Anneal parts if possible'
+        ],
+        parameterAdjustments: {
+          temperature: 'Reduce melt temperature by 15-25°C',
+          pressure: 'Reduce hold pressure by 20-30%'
+        },
+        severity: 'Critical'
+      },
+      {
+        name: 'Delamination',
+        description: 'Separation of material layers or poor adhesion between layers',
+        causes: {
+          temperature: ['Insufficient melt temperature', 'Poor temperature uniformity'],
+          material: ['Contamination between layers', 'Incompatible materials', 'Moisture'],
+          mold: ['Contaminated mold surface', 'Poor mold temperature']
+        },
+        solutions: [
+          'Increase melt temperature by 10-15°C',
+          'Ensure material compatibility',
+          'Clean mold surfaces thoroughly',
+          'Improve temperature uniformity',
+          'Check for material contamination'
+        ],
+        parameterAdjustments: {
+          temperature: 'Increase melt temperature by 10-15°C'
+        },
+        severity: 'High'
+      },
+      {
+        name: 'Contamination',
+        description: 'Foreign material or color streaks in molded parts',
+        causes: {
+          material: ['Contaminated raw material', 'Cross-contamination', 'Regrind contamination'],
+          mold: ['Dirty mold surfaces', 'Lubricant contamination'],
+          timing: ['Insufficient purging', 'Material changeover residue']
+        },
+        solutions: [
+          'Inspect and clean raw materials',
+          'Thorough purging between materials',
+          'Clean mold surfaces',
+          'Check regrind quality',
+          'Improve material handling procedures'
+        ],
+        parameterAdjustments: {
+          timing: 'Extended purging cycles'
+        },
+        severity: 'Medium'
+      },
+      {
+        name: 'Poor Color Distribution',
+        description: 'Uneven color mixing or color variation in parts',
+        causes: {
+          material: ['Poor colorant dispersion', 'Inadequate mixing', 'Colorant segregation'],
+          temperature: ['Inconsistent melt temperature', 'Poor temperature control'],
+          speed: ['Insufficient screw mixing', 'Poor back pressure']
+        },
+        solutions: [
+          'Improve screw mixing design',
+          'Increase back pressure',
+          'Ensure consistent melt temperature',
+          'Pre-blend colorants properly',
+          'Check colorant compatibility'
+        ],
+        parameterAdjustments: {
+          pressure: 'Increase back pressure by 20-40%',
+          temperature: 'Maintain consistent temperatures ±3°C'
+        },
+        severity: 'Low'
+      }
+    ]
+  },
+  {
+    id: 'cycling',
+    title: 'Cycling Problems',
+    color: 'red',
+    icon: RotateCcw,
+    defects: [
+      {
+        name: 'Part Sticking and Ejector Pin Marks',
+        description: 'Parts adhering to mold or damage from ejection system',
+        causes: {
+          temperature: ['Insufficient cooling', 'Mold temperature too high'],
+          timing: ['Premature ejection', 'Insufficient cooling time'],
+          mold: ['Poor draft angles', 'Rough surface finish', 'Ejector pin issues'],
+          pressure: ['Excessive hold pressure']
+        },
+        solutions: [
+          'Extend cooling time',
+          'Reduce mold temperature',
+          'Improve draft angles',
+          'Polish mold surfaces',
+          'Check ejector pin alignment',
+          'Reduce hold pressure'
+        ],
+        parameterAdjustments: {
+          timing: 'Extend cooling time by 20-40%',
+          temperature: 'Reduce mold temperature by 5-10°C',
+          pressure: 'Reduce hold pressure by 15-25%'
+        },
+        severity: 'Medium'
+      },
+      {
+        name: 'Occasional Part Hang-Up',
+        description: 'Intermittent part sticking or ejection problems',
+        causes: {
+          mold: ['Inconsistent mold condition', 'Variable surface conditions'],
+          temperature: ['Temperature fluctuations', 'Cooling system issues'],
+          material: ['Material property variations', 'Contamination buildup']
+        },
+        solutions: [
+          'Stabilize process temperatures',
+          'Regular mold cleaning and maintenance',
+          'Monitor material lot consistency',
+          'Check cooling system function',
+          'Implement preventive maintenance'
+        ],
+        parameterAdjustments: {
+          temperature: 'Improve temperature stability to ±2°C',
+          timing: 'Add safety margin to cooling time'
+        },
+        severity: 'Low'
+      },
+      {
+        name: 'Nozzle Freeze-Off',
+        description: 'Material solidification blocking nozzle flow',
+        causes: {
+          temperature: ['Nozzle temperature too low', 'Heat loss during cycle'],
+          timing: ['Excessive cycle time', 'Long interruptions'],
+          mold: ['Cold sprue bushing', 'Poor thermal contact']
+        },
+        solutions: [
+          'Increase nozzle temperature by 10-20°C',
+          'Improve nozzle heating system',
+          'Reduce cycle time',
+          'Heat sprue bushing',
+          'Improve thermal contact'
+        ],
+        parameterAdjustments: {
+          temperature: 'Increase nozzle temperature by 10-20°C',
+          timing: 'Minimize cycle interruptions'
+        },
+        severity: 'High'
+      },
+      {
+        name: 'Drool and Stringing',
+        description: 'Material leakage from nozzle between cycles',
+        causes: {
+          temperature: ['Nozzle temperature too high', 'Excessive back pressure'],
+          pressure: ['Insufficient decompression', 'Check valve problems'],
+          material: ['Low viscosity material', 'Material degradation']
+        },
+        solutions: [
+          'Reduce nozzle temperature by 5-10°C',
+          'Increase decompression',
+          'Check valve maintenance',
+          'Use higher viscosity grade',
+          'Implement shut-off nozzle'
+        ],
+        parameterAdjustments: {
+          temperature: 'Reduce nozzle temperature by 5-10°C',
+          pressure: 'Increase decompression by 10-20%'
+        },
+        severity: 'Low'
+      }
+    ]
+  }
+];
+
+export default function App() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedSeverity, setSelectedSeverity] = useState('all');
+  const [openDefects, setOpenDefects] = useState<Record<string, boolean>>({});
+  const [bookmarkedDefects, setBookmarkedDefects] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState('defects');
+  const [parameterCalculator, setParameterCalculator] = useState({
+    currentTemp: '',
+    currentPressure: '',
+    currentSpeed: '',
+    defectType: ''
+  });
+  
+  const isMobile = useIsMobile();
+
+  const filteredDefects = useMemo(() => {
+    let allDefects: Array<Defect & { categoryId: string; categoryTitle: string; categoryColor: string }> = [];
+    
+    defectCategories.forEach(category => {
+      if (selectedCategory === 'all' || selectedCategory === category.id) {
+        category.defects.forEach(defect => {
+          allDefects.push({
+            ...defect,
+            categoryId: category.id,
+            categoryTitle: category.title,
+            categoryColor: category.color
+          });
+        });
+      }
+    });
+
+    return allDefects.filter(defect => {
+      const matchesSearch = searchTerm === '' || 
+        defect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        defect.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        JSON.stringify(defect.causes).toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesSeverity = selectedSeverity === 'all' || defect.severity === selectedSeverity;
+      
+      return matchesSearch && matchesSeverity;
+    });
+  }, [searchTerm, selectedCategory, selectedSeverity]);
+
+  const toggleDefect = (defectName: string) => {
+    setOpenDefects(prev => ({ ...prev, [defectName]: !prev[defectName] }));
+  };
+
+  const toggleBookmark = (defectName: string) => {
+    const newBookmarks = new Set(bookmarkedDefects);
+    if (newBookmarks.has(defectName)) {
+      newBookmarks.delete(defectName);
+    } else {
+      newBookmarks.add(defectName);
+    }
+    setBookmarkedDefects(newBookmarks);
+  };
+
+  const exportDefectGuide = (defect: Defect & { categoryTitle: string }) => {
+    const guide = {
+      defect: defect.name,
+      category: defect.categoryTitle,
+      description: defect.description,
+      causes: defect.causes,
+      solutions: defect.solutions,
+      parameterAdjustments: defect.parameterAdjustments,
+      severity: defect.severity,
+      exportDate: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(guide, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${defect.name.replace(/\s+/g, '-').toLowerCase()}-troubleshooting-guide.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const generateTroubleshootingChecklist = () => {
+    const checklist = filteredDefects.map(defect => ({
+      defect: defect.name,
+      category: defect.categoryTitle,
+      severity: defect.severity,
+      quickChecks: defect.solutions.slice(0, 3),
+      parameters: defect.parameterAdjustments
+    }));
+    
+    const blob = new Blob([JSON.stringify(checklist, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'injection-molding-troubleshooting-checklist.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const getCauseIcon = (causeType: string) => {
+    switch (causeType) {
+      case 'temperature': return <Thermometer className="w-4 h-4" />;
+      case 'pressure': return <Gauge className="w-4 h-4" />;
+      case 'speed': return <Zap className="w-4 h-4" />;
+      case 'timing': return <Clock className="w-4 h-4" />;
+      case 'mold': return <Settings className="w-4 h-4" />;
+      case 'material': return <TestTube className="w-4 h-4" />;
+      default: return <AlertTriangle className="w-4 h-4" />;
+    }
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'Low': return 'bg-green-100 text-green-800 border-green-200';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'High': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'Critical': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getCategoryColor = (color: string) => {
+    switch (color) {
+      case 'blue': return 'border-blue-500 bg-blue-50';
+      case 'green': return 'border-green-500 bg-green-50';
+      case 'orange': return 'border-orange-500 bg-orange-50';
+      case 'red': return 'border-red-500 bg-red-50';
+      default: return 'border-gray-500 bg-gray-50';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <header className="bg-slate-900 text-white py-6 sticky top-0 z-50">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center gap-3 mb-4">
+            <Settings className="w-8 h-8" />
+            <h1 className={cn(
+              "font-bold",
+              isMobile ? "text-xl" : "text-2xl xl:text-3xl"
+            )}>
+              Injection Molding Defect Troubleshooting Guide v2.0
+            </h1>
+          </div>
+          
+          {/* Search and Filters */}
+          <div className={cn(
+            "flex flex-wrap gap-4 items-center",
+            isMobile ? "flex-col" : "flex-row"
+          )}>
+            <div className="relative flex-1 min-w-64">
+              <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search defects, causes, or solutions..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-white"
+              />
+            </div>
+            
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-48 bg-white">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {defectCategories.map(category => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select value={selectedSeverity} onValueChange={setSelectedSeverity}>
+              <SelectTrigger className="w-40 bg-white">
+                <SelectValue placeholder="Severity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Severity</SelectItem>
+                <SelectItem value="Low">Low</SelectItem>
+                <SelectItem value="Medium">Medium</SelectItem>
+                <SelectItem value="High">High</SelectItem>
+                <SelectItem value="Critical">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Button 
+              onClick={generateTroubleshootingChecklist}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export Checklist
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="defects">Defect Database</TabsTrigger>
+            <TabsTrigger value="calculator">Parameter Calculator</TabsTrigger>
+            <TabsTrigger value="bookmarks">Bookmarks ({bookmarkedDefects.size})</TabsTrigger>
+            <TabsTrigger value="overview">Category Overview</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="defects" className="space-y-6">
+            {/* Results Summary */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {filteredDefects.length} of {defectCategories.reduce((acc, cat) => acc + cat.defects.length, 0)} defects
+                  </div>
+                  <div className="flex gap-2">
+                    {['Critical', 'High', 'Medium', 'Low'].map(severity => {
+                      const count = filteredDefects.filter(d => d.severity === severity).length;
+                      return count > 0 ? (
+                        <Badge key={severity} className={cn("text-xs", getSeverityColor(severity))}>
+                          {severity}: {count}
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Defect Cards */}
+            <div className="grid gap-4">
+              {filteredDefects.map((defect, index) => (
+                <Card key={`${defect.categoryId}-${defect.name}`} className={cn(
+                  "transition-all duration-200 hover:shadow-md",
+                  getCategoryColor(defect.categoryColor)
+                )}>
+                  <Collapsible 
+                    open={openDefects[defect.name]} 
+                    onOpenChange={() => toggleDefect(defect.name)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <CardHeader className="cursor-pointer hover:bg-white/50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "p-2 rounded-full",
+                              defect.categoryColor === 'blue' && "bg-blue-600 text-white",
+                              defect.categoryColor === 'green' && "bg-green-600 text-white",
+                              defect.categoryColor === 'orange' && "bg-orange-600 text-white",
+                              defect.categoryColor === 'red' && "bg-red-600 text-white"
+                            )}>
+                              {React.createElement(defectCategories.find(cat => cat.id === defect.categoryId)?.icon || Eye, { className: "w-4 h-4" })}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <CardTitle className="text-lg">{defect.name}</CardTitle>
+                                <Badge className={cn("text-xs", getSeverityColor(defect.severity))}>
+                                  {defect.severity}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {defect.categoryTitle}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {defect.description}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleBookmark(defect.name);
+                              }}
+                              className={cn(
+                                bookmarkedDefects.has(defect.name) && "text-yellow-600"
+                              )}
+                            >
+                              {bookmarkedDefects.has(defect.name) ? <Star className="w-4 h-4 fill-current" /> : <BookmarkPlus className="w-4 h-4" />}
+                            </Button>
+                            {openDefects[defect.name] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </div>
+                        </div>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <CardContent className="pt-0 pb-6">
+                        <div className={cn(
+                          "grid gap-6",
+                          isMobile ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-2"
+                        )}>
+                          {/* Causes */}
+                          <div className="space-y-4">
+                            <h4 className="font-semibold text-red-700 flex items-center gap-2">
+                              <AlertTriangle className="w-4 h-4" />
+                              Root Causes
+                            </h4>
+                            {Object.entries(defect.causes).map(([causeType, causes]) => (
+                              <div key={causeType} className="space-y-2">
+                                <div className="flex items-center gap-2 text-sm font-medium capitalize">
+                                  {getCauseIcon(causeType)}
+                                  {causeType} Issues
+                                </div>
+                                <ul className="ml-6 space-y-1">
+                                  {causes?.map((cause, i) => (
+                                    <li key={i} className="text-sm text-muted-foreground list-disc">
+                                      {cause}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Solutions */}
+                          <div className="space-y-4">
+                            <h4 className="font-semibold text-green-700 flex items-center gap-2">
+                              <CheckCircle className="w-4 h-4" />
+                              Corrective Actions
+                            </h4>
+                            <ul className="space-y-2">
+                              {defect.solutions.map((solution, i) => (
+                                <li key={i} className="text-sm flex items-start gap-2">
+                                  <CheckCircle className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                                  {solution}
+                                </li>
+                              ))}
+                            </ul>
+
+                            {/* Parameter Adjustments */}
+                            {Object.keys(defect.parameterAdjustments).length > 0 && (
+                              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                <h5 className="font-medium text-blue-900 mb-2">Parameter Adjustments:</h5>
+                                <div className="space-y-1">
+                                  {Object.entries(defect.parameterAdjustments).map(([param, adjustment]) => (
+                                    <div key={param} className="text-xs">
+                                      <span className="font-medium capitalize">{param}:</span> {adjustment}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => exportDefectGuide(defect)}
+                              className="mt-4"
+                            >
+                              <Download className="w-3 h-3 mr-1" />
+                              Export Guide
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="calculator" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  Parameter Adjustment Calculator
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className={cn(
+                  "grid gap-4",
+                  isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-4"
+                )}>
+                  <div>
+                    <Label htmlFor="current-temp">Current Temperature (°C)</Label>
+                    <Input
+                      id="current-temp"
+                      type="number"
+                      value={parameterCalculator.currentTemp}
+                      onChange={(e) => setParameterCalculator(prev => ({ ...prev, currentTemp: e.target.value }))}
+                      placeholder="220"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="current-pressure">Current Pressure (bar)</Label>
+                    <Input
+                      id="current-pressure"
+                      type="number"
+                      value={parameterCalculator.currentPressure}
+                      onChange={(e) => setParameterCalculator(prev => ({ ...prev, currentPressure: e.target.value }))}
+                      placeholder="1000"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="current-speed">Current Speed (mm/s)</Label>
+                    <Input
+                      id="current-speed"
+                      type="number"
+                      value={parameterCalculator.currentSpeed}
+                      onChange={(e) => setParameterCalculator(prev => ({ ...prev, currentSpeed: e.target.value }))}
+                      placeholder="50"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="defect-type">Defect Type</Label>
+                    <Select 
+                      value={parameterCalculator.defectType}
+                      onValueChange={(value) => setParameterCalculator(prev => ({ ...prev, defectType: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select defect" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {defectCategories.flatMap(cat => 
+                          cat.defects.map(defect => (
+                            <SelectItem key={defect.name} value={defect.name}>
+                              {defect.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {parameterCalculator.defectType && (
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      <h4 className="font-semibold mb-3">Recommended Adjustments for {parameterCalculator.defectType}:</h4>
+                      {(() => {
+                        const selectedDefect = defectCategories
+                          .flatMap(cat => cat.defects)
+                          .find(defect => defect.name === parameterCalculator.defectType);
+                        
+                        if (!selectedDefect) return null;
+                        
+                        return (
+                          <div className="space-y-2">
+                            {Object.entries(selectedDefect.parameterAdjustments).map(([param, adjustment]) => (
+                              <div key={param} className="flex items-center justify-between p-2 bg-white rounded">
+                                <span className="font-medium capitalize">{param}:</span>
+                                <span className="text-sm">{adjustment}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="bookmarks" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-600" />
+                  Bookmarked Defects ({bookmarkedDefects.size})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {bookmarkedDefects.size === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Star className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p>No bookmarked defects yet.</p>
+                    <p className="text-sm">Bookmark defects from the main database for quick access.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {Array.from(bookmarkedDefects).map(defectName => {
+                      const defectData = defectCategories
+                        .flatMap(cat => cat.defects.map(d => ({ ...d, categoryId: cat.id, categoryTitle: cat.title, categoryColor: cat.color })))
+                        .find(d => d.name === defectName);
+                      
+                      if (!defectData) return null;
+                      
+                      return (
+                        <div key={defectName} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "p-1 rounded",
+                              defectData.categoryColor === 'blue' && "bg-blue-100 text-blue-600",
+                              defectData.categoryColor === 'green' && "bg-green-100 text-green-600",
+                              defectData.categoryColor === 'orange' && "bg-orange-100 text-orange-600",
+                              defectData.categoryColor === 'red' && "bg-red-100 text-red-600"
+                            )}>
+                              {React.createElement(defectCategories.find(cat => cat.id === defectData.categoryId)?.icon || Eye, { className: "w-4 h-4" })}
+                            </div>
+                            <div>
+                              <div className="font-medium">{defectData.name}</div>
+                              <div className="text-sm text-muted-foreground">{defectData.categoryTitle}</div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Badge className={cn("text-xs", getSeverityColor(defectData.severity))}>
+                              {defectData.severity}
+                            </Badge>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => toggleBookmark(defectName)}
+                            >
+                              <Star className="w-4 h-4 text-yellow-600 fill-current" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="overview" className="space-y-6">
+            <div className={cn(
+              "grid gap-6",
+              isMobile ? "grid-cols-1" : "grid-cols-2 xl:grid-cols-4"
+            )}>
+              {defectCategories.map(category => {
+                const Icon = category.icon;
+                return (
+                  <Card key={category.id} className={cn(
+                    "transition-all duration-200 hover:shadow-lg cursor-pointer",
+                    getCategoryColor(category.color)
+                  )} onClick={() => {
+                    setSelectedCategory(category.id);
+                    setActiveTab('defects');
+                  }}>
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "p-3 rounded-full",
+                          category.color === 'blue' && "bg-blue-600 text-white",
+                          category.color === 'green' && "bg-green-600 text-white",
+                          category.color === 'orange' && "bg-orange-600 text-white",
+                          category.color === 'red' && "bg-red-600 text-white"
+                        )}>
+                          <Icon className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{category.title}</CardTitle>
+                          <p className="text-sm text-muted-foreground">
+                            {category.defects.length} defects
+                          </p>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {category.defects.slice(0, 3).map(defect => (
+                          <div key={defect.name} className="text-sm flex items-center justify-between">
+                            <span>{defect.name}</span>
+                            <Badge className={cn("text-xs", getSeverityColor(defect.severity))}>
+                              {defect.severity}
+                            </Badge>
+                          </div>
+                        ))}
+                        {category.defects.length > 3 && (
+                          <div className="text-xs text-muted-foreground">
+                            +{category.defects.length - 3} more defects
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Quick Statistics */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Database Statistics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn(
+                  "grid gap-4",
+                  isMobile ? "grid-cols-2" : "grid-cols-4"
+                )}>
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {defectCategories.reduce((acc, cat) => acc + cat.defects.length, 0)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Total Defects</div>
+                  </div>
+                  <div className="text-center p-4 bg-red-50 rounded-lg">
+                    <div className="text-2xl font-bold text-red-600">
+                      {defectCategories.flatMap(cat => cat.defects).filter(d => d.severity === 'Critical').length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Critical Issues</div>
+                  </div>
+                  <div className="text-center p-4 bg-orange-50 rounded-lg">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {defectCategories.flatMap(cat => cat.defects).filter(d => d.severity === 'High').length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">High Priority</div>
+                  </div>
+                  <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {bookmarkedDefects.size}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Bookmarked</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Footer */}
+        <footer className="mt-12 py-6 border-t border-gray-200 bg-white rounded-lg">
+          <div className="text-center text-sm text-muted-foreground">
+            <p>© 2025 Injection Molding Defect Troubleshooting Guide v2.0</p>
+            <p className="mt-1">Professional industrial troubleshooting system for injection molding technicians and operators</p>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
